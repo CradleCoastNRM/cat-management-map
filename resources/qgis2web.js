@@ -927,171 +927,340 @@ let measuring = false;
   }
 
 
-//geocoder
+//geocoder - Tasmania LIST Address Geocodes
 
-  //Layer to represent the point of the geocoded address
-  var geocoderLayer = new ol.layer.Vector({
-      source: new ol.source.Vector(),
-  });
-  map.addLayer(geocoderLayer);
-  var vectorSource = geocoderLayer.getSource();
+// Layer used to display the selected address marker
+var geocoderLayer = new ol.layer.Vector({
+    source: new ol.source.Vector()
+});
 
-  //Variable used to store the coordinates of geocoded addresses
-  var obj2 = {
-  value: '',
-  letMeKnow() {
-      //console.log(`Geocoded position: ${this.gcd}`);
-  },
-  get gcd() {
-      return this.value;
-  },
-  set gcd(value) {
-      this.value = value;
-      this.letMeKnow();
-  }
-  }
+map.addLayer(geocoderLayer);
 
-  var obj = {
-      value: '',
-      get label() {
-          return this.value;
-      },
-      set label(value) {
-          this.value = value;
-      }
-  }
+var vectorSource = geocoderLayer.getSource();
 
-  // Function to handle the selected address
-  function onSelected(feature) {
-      obj.label = feature;
-      input.value = typeof obj.label.properties.label === "undefined"? obj.label.properties.display_name : obj.label.properties.label;
-      var coordinates = ol.proj.transform(
-      [feature.geometry.coordinates[0], feature.geometry.coordinates[1]],
-      "EPSG:4326",
-      map.getView().getProjection()
-      );
-      vectorSource.clear(true);
-      obj2.gcd = [feature.geometry.coordinates[0], feature.geometry.coordinates[1]];
-      var marker = new ol.Feature(new ol.geom.Point(coordinates));
-      var zIndex = 1;
-      marker.setStyle(new ol.style.Style({
-      image: new ol.style.Icon(({
-          anchor: [0.5, 1],
-          anchorXUnits: 'fraction',
-          anchorYUnits: 'fraction',
-          scale: 0.7,
-          opacity: 1,
-          src: "./resources/marker.png",
-          zIndex: zIndex
-      })),
-      zIndex: zIndex
-      }));
-      vectorSource.addFeature(marker);
-      map.getView().setCenter(coordinates);
-      map.getView().setZoom(18);
-  }
 
-  // Format the result in the autocomplete search bar
-  var formatResult = function (feature, el) {
-      var title = document.createElement("strong");
-      el.appendChild(title);
-      var detailsContainer = document.createElement("small");
-      el.appendChild(detailsContainer);
-      var details = [];
-      title.innerHTML = feature.properties.label || feature.properties.display_name;
-      var types = {
-      housenumber: "numéro",
-      street: "rue",
-      locality: "lieu-dit",
-      municipality: "commune",
-      };
-      if (
-      feature.properties.city &&
-      feature.properties.city !== feature.properties.name
-      ) {
-      details.push(feature.properties.city);
-      }
-      if (feature.properties.context) {
-      details.push(feature.properties.context);
-      }
-      detailsContainer.innerHTML = details.join(", ");
-  };
+// Function to handle a selected LIST address
+function onLISTAddressSelected(feature) {
 
-  // Define a class to create the control button for the search bar in a div tag
-  class AddDomControl extends ol.control.Control {
-      constructor(elementToAdd, opt_options) {
-      const options = opt_options || {};
+    var coordinates = feature.geometry.coordinates;
 
-      const element = document.createElement("div");
-      if (options.className) {
-          element.className = options.className;
-      }
-      element.appendChild(elementToAdd);
+    // LIST Address Geocodes are returned in EPSG:3857,
+    // which is the projection used by this web map.
+    vectorSource.clear(true);
 
-      super({
-          element: element,
-          target: options.target,
-      });
-      }
-  }
+    var marker = new ol.Feature(
+        new ol.geom.Point(coordinates)
+    );
 
-  // Function to show you can do something with the returned elements
-  function myHandler(featureCollection) {
-      //console.log(featureCollection);
-  }
+    var zIndex = 1;
 
-  // URL for API
-  const url = {"Nominatim OSM": "https://nominatim.openstreetmap.org/search?format=geojson&addressdetails=1&",
-  "France BAN": "https://api-adresse.data.gouv.fr/search/?"}
-  var API_URL = "//api-adresse.data.gouv.fr";
+    marker.setStyle(new ol.style.Style({
+        image: new ol.style.Icon({
+            anchor: [0.5, 1],
+            anchorXUnits: 'fraction',
+            anchorYUnits: 'fraction',
+            scale: 0.7,
+            opacity: 1,
+            src: "./resources/marker.png",
+            zIndex: zIndex
+        }),
+        zIndex: zIndex
+    }));
 
-  // Create search by adresses component
-  var containers = new Photon.Search({
-    resultsHandler: myHandler,
-    onSelected: onSelected,
-    placeholder: "Search an address",
-    formatResult: formatResult,
-    //url: API_URL + "/search/?",
-    url: url["Nominatim OSM"],
-    position: "topright",
-    // ,includePosition: function() {
-    //   return ol.proj.transform(
-    //     map.getView().getCenter(),
-    //     map.getView().getProjection(), //'EPSG:3857',
-    //     'EPSG:4326'
-    //   );
-    // }
-  });
+    vectorSource.addFeature(marker);
 
-  // Add the created DOM element within the map
-  //var left = document.getElementById("top-left-container");
-  var controlGeocoder = new AddDomControl(containers, {
-    className: "photon-geocoder-autocomplete ol-unselectable ol-control",
-  });
-  map.addControl(controlGeocoder);
-  var search = document.getElementsByClassName("photon-geocoder-autocomplete ol-unselectable ol-control")[0];
-  search.style.display = "flex";
+    // Centre and zoom the map
+    map.getView().setCenter(coordinates);
+    map.getView().setZoom(18);
+}
 
-  // Create the new button element
-  var button = document.createElement("button");
-  button.type = "button";
-  button.id = "gcd-button-control";
-  button.className = "gcd-gl-btn fa fa-search leaflet-control";
 
-  // Ajouter le bouton à l'élément parent
-  search.insertBefore(button, search.firstChild);
-  last = search.lastChild;
-  last.style.display = "none";
-  button.addEventListener("click", function (e) {
-      if (last.style.display === "none") {
-          last.style.display = "block";
-      } else {
-          last.style.display = "none";
-      }
-  });
-  input = document.getElementsByClassName("photon-input")[0];
-  //var searchbar = document.getElementsByClassName("photon-geocoder-autocomplete ol-unselectable ol-control")[0]
-  //left.appendChild(searchbar);
+// Create the search control
+var searchContainer = document.createElement("div");
+
+searchContainer.className =
+    "photon-geocoder-autocomplete ol-unselectable ol-control";
+
+searchContainer.style.display = "flex";
+
+
+// Create the search button
+var button = document.createElement("button");
+
+button.type = "button";
+button.id = "gcd-button-control";
+button.className = "gcd-gl-btn fa fa-search leaflet-control";
+button.title = "Search an address";
+
+
+// Create the search area
+var searchArea = document.createElement("div");
+
+searchArea.className = "photon-autocomplete";
+searchArea.style.display = "none";
+searchArea.style.position = "relative";
+
+
+// Create the input
+var input = document.createElement("input");
+
+input.type = "text";
+input.className = "photon-input";
+input.placeholder = "Search an address";
+input.autocomplete = "off";
+
+
+// Create results container
+var resultsContainer = document.createElement("div");
+
+resultsContainer.className = "list-address-results";
+
+resultsContainer.style.position = "absolute";
+resultsContainer.style.left = "0";
+resultsContainer.style.top = "32px";
+resultsContainer.style.width = "300px";
+resultsContainer.style.maxHeight = "300px";
+resultsContainer.style.overflowY = "auto";
+resultsContainer.style.backgroundColor = "#ffffff";
+resultsContainer.style.border = "1px solid #cccccc";
+resultsContainer.style.zIndex = "9999";
+resultsContainer.style.display = "none";
+
+
+// Assemble search area
+searchArea.appendChild(input);
+searchArea.appendChild(resultsContainer);
+
+
+// Assemble search control
+searchContainer.appendChild(button);
+searchContainer.appendChild(searchArea);
+
+
+// Use the existing qgis2web control system
+var controlGeocoder = new AddDomControl(searchContainer, {
+    className:
+        "photon-geocoder-autocomplete ol-unselectable ol-control"
+});
+
+map.addControl(controlGeocoder);
+
+
+// Search button opens/closes the search box
+button.addEventListener("click", function() {
+
+    if (searchArea.style.display === "none") {
+
+        searchArea.style.display = "block";
+        input.focus();
+
+    } else {
+
+        searchArea.style.display = "none";
+        resultsContainer.style.display = "none";
+
+    }
+
+});
+
+
+// Search the LIST Address Geocodes service
+function searchLISTAddresses() {
+
+    var query = input.value.trim();
+
+    if (query.length < 3) {
+
+        resultsContainer.style.display = "none";
+        resultsContainer.innerHTML = "";
+
+        return;
+    }
+
+
+    resultsContainer.style.display = "block";
+
+    resultsContainer.innerHTML =
+        '<div style="padding:10px;">Searching...</div>';
+
+
+    // Remove commas and split the search into individual words
+    var searchTerms = query
+        .replace(/,/g, " ")
+        .split(/\s+/)
+        .filter(function(term) {
+            return term.length > 0;
+        });
+
+
+    // Build the ArcGIS SQL query.
+    // Every search term must occur in the ADDRESS field.
+    var whereParts = searchTerms.map(function(term) {
+
+        var escapedTerm = term.replace(/'/g, "''");
+
+        return "ADDRESS LIKE '%" + escapedTerm + "%'";
+
+    });
+
+
+    var whereClause = whereParts.join(" AND ");
+
+
+    var listUrl =
+        "https://services.thelist.tas.gov.au/arcgis/rest/services/Public/SearchService/MapServer/7/query?" +
+        "where=" + encodeURIComponent(whereClause) +
+        "&outFields=" + encodeURIComponent(
+            "ADDRESS,PID,PROPERTY_NAME,LOCATION,UNIT_TYPE,UNIT_NUMBER,STREET_NUMBER_FROM,STREET_NUMBER_TO,STREET,LOCALITY,STATE,POSTCODE"
+        ) +
+        "&returnGeometry=true" +
+        "&outSR=3857" +
+        "&f=geojson" +
+        "&resultRecordCount=10";
+
+
+    fetch(listUrl)
+
+        .then(function(response) {
+
+            if (!response.ok) {
+                throw new Error("LIST search failed");
+            }
+
+            return response.json();
+
+        })
+
+        .then(function(data) {
+
+            resultsContainer.innerHTML = "";
+
+
+            if (!data.features || data.features.length === 0) {
+
+                resultsContainer.innerHTML =
+                    '<div style="padding:10px;">No addresses found</div>';
+
+                return;
+            }
+
+
+            // Create a result for each matching address
+            data.features.forEach(function(feature) {
+
+                var result = document.createElement("div");
+
+                result.className = "list-address-result";
+
+                result.style.padding = "9px 10px";
+                result.style.cursor = "pointer";
+                result.style.borderBottom = "1px solid #dddddd";
+                result.style.backgroundColor = "#ffffff";
+                result.style.fontSize = "13px";
+
+
+                var address =
+                    feature.properties.ADDRESS || "Address";
+
+
+                result.textContent = address;
+
+
+                // Highlight result when mouse is over it
+                result.addEventListener("mouseover", function() {
+
+                    result.style.backgroundColor = "#eeeeee";
+
+                });
+
+
+                result.addEventListener("mouseout", function() {
+
+                    result.style.backgroundColor = "#ffffff";
+
+                });
+
+
+                // Select address
+                result.addEventListener("click", function() {
+
+                    input.value = address;
+
+                    onLISTAddressSelected(feature);
+
+                    resultsContainer.style.display = "none";
+
+                });
+
+
+                resultsContainer.appendChild(result);
+
+            });
+
+        })
+
+        .catch(function(error) {
+
+            console.error(error);
+
+            resultsContainer.innerHTML =
+                '<div style="padding:10px;">Unable to search addresses</div>';
+
+        });
+
+}
+
+
+// Search after the user pauses typing
+var searchTimer = null;
+
+input.addEventListener("input", function() {
+
+    clearTimeout(searchTimer);
+
+    searchTimer = setTimeout(function() {
+
+        searchLISTAddresses();
+
+    }, 350);
+
+});
+
+
+// Also search when Enter is pressed
+input.addEventListener("keydown", function(event) {
+
+    if (event.key === "Enter") {
+
+        event.preventDefault();
+
+        clearTimeout(searchTimer);
+
+        searchLISTAddresses();
+
+    }
+
+});
+
+
+// Hide results if the user clicks somewhere else
+map.getViewport().addEventListener("click", function(event) {
+
+    if (!searchContainer.contains(event.target)) {
+
+        resultsContainer.style.display = "none";
+
+    }
+
+});
+
+
+// Keep the search bar available to the existing qgis2web
+// control-positioning code.
+var searchbar =
+    document.getElementsByClassName(
+        "photon-geocoder-autocomplete ol-unselectable ol-control"
+    )[0];
         
 
 //layer search
