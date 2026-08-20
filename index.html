@@ -9,20 +9,15 @@
 
         <link rel="stylesheet" href="./resources/ol.css">
         <link rel="stylesheet" href="resources/fontawesome-all.min.css">
+        <link href="resources/photon-geocoder-autocomplete.min.css" rel="stylesheet">
         <link rel="stylesheet" href="./resources/ol-layerswitcher.css">
         <link rel="stylesheet" href="./resources/qgis2web.css">
 
         <style>
-        /* General page styling */
         html, body {
             background-color: #ffffff;
-            width: 100%;
-            height: 100%;
-            margin: 0;
-            padding: 0;
         }
 
-        /* OpenLayers controls */
         .ol-control > * {
             background-color: #f8f8f8!important;
             color: #444444!important;
@@ -48,69 +43,19 @@
             background-color: rgba(255,255,255,.4) !important;
             padding: 2px !important;
         }
+        </style>
 
-        /* Full-screen map */
+        <style>
+        html, body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
+
         #map {
             width: 100%;
             height: 100vh;
-        }
-
-        /* LIST address search */
-        .list-address-search {
-            position: relative;
-            background: rgba(255,255,255,0.9);
-            padding: 2px !important;
-            min-width: 300px;
-        }
-
-        .list-address-search input {
-            width: 250px;
-            height: 28px;
-            border: none;
-            padding: 0 8px;
-            font-size: 14px;
-            outline: none;
-            background: #f8f8f8;
-        }
-
-        .list-address-search button {
-            width: 32px;
-            height: 30px;
-            border: none;
-            cursor: pointer;
-            background: #f8f8f8;
-            color: #444444;
-        }
-
-        .list-address-results {
-            position: absolute;
-            top: 34px;
-            left: 0;
-            width: 296px;
-            background: white;
-            border: 1px solid #ccc;
-            max-height: 300px;
-            overflow-y: auto;
-            z-index: 9999;
-        }
-
-        .list-address-result {
-            padding: 8px 10px;
-            cursor: pointer;
-            border-bottom: 1px solid #ddd;
-            font-size: 13px;
-            background: white;
-        }
-
-        .list-address-result:hover {
-            background: #eeeeee;
-        }
-
-        .list-search-loading,
-        .list-search-no-results {
-            padding: 10px;
-            font-size: 13px;
-            background: white;
         }
         </style>
 
@@ -128,34 +73,24 @@
 
         </div>
 
-        <!-- QGIS / OpenLayers resources -->
         <script src="resources/qgis2web_expressions.js"></script>
         <script src="./resources/functions.js"></script>
         <script src="./resources/ol.js"></script>
         <script src="./resources/ol-layerswitcher.js"></script>
-
-        <!-- Photon library retained temporarily -->
         <script src="resources/photon-geocoder-autocomplete.min.js"></script>
-
         <script src="resources/olms.js"></script>
 
-        <!-- Map layers -->
         <script src="layers/CatManagementAreasMGA2020_1.js"></script>
         <script src="layers/ExistingCatProhibitedAreasMGA2020_2.js"></script>
         <script src="layers/KIThornbillandScrubtitRecordingsMGA2020_3.js"></script>
 
-        <!-- Layer styles -->
         <script src="styles/CatManagementAreasMGA2020_1_style.js"></script>
         <script src="styles/ExistingCatProhibitedAreasMGA2020_2_style.js"></script>
         <script src="styles/KIThornbillandScrubtitRecordingsMGA2020_3_style.js"></script>
 
-        <!-- Layer configuration -->
         <script src="./layers/layers.js" type="text/javascript"></script>
 
-        <!-- Supporting resources -->
         <script src="./resources/Autolinker.min.js"></script>
-
-        <!-- Main qgis2web script -->
         <script src="./resources/qgis2web.js"></script>
 
     </body>
