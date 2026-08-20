@@ -927,169 +927,196 @@ let measuring = false;
   }
 
 
-//geocoder
+//geocoder - Tasmania LIST Address Geocodes
 
-  //Layer to represent the point of the geocoded address
-  var geocoderLayer = new ol.layer.Vector({
-      source: new ol.source.Vector(),
-  });
-  map.addLayer(geocoderLayer);
-  var vectorSource = geocoderLayer.getSource();
+// Layer to represent the point of the selected address
+var geocoderLayer = new ol.layer.Vector({
+    source: new ol.source.Vector()
+});
+map.addLayer(geocoderLayer);
+var vectorSource = geocoderLayer.getSource();
 
-  //Variable used to store the coordinates of geocoded addresses
-  var obj2 = {
-  value: '',
-  letMeKnow() {
-      //console.log(`Geocoded position: ${this.gcd}`);
-  },
-  get gcd() {
-      return this.value;
-  },
-  set gcd(value) {
-      this.value = value;
-      this.letMeKnow();
-  }
-  }
+// Create the search container
+var searchContainer = document.createElement('div');
+searchContainer.className = 'list-address-search ol-unselectable ol-control';
+searchContainer.style.display = 'flex';
+searchContainer.style.alignItems = 'center';
 
-  var obj = {
-      value: '',
-      get label() {
-          return this.value;
-      },
-      set label(value) {
-          this.value = value;
-      }
-  }
+// Search button
+var searchButton = document.createElement('button');
+searchButton.type = 'button';
+searchButton.className = 'gcd-gl-btn fa fa-search';
+searchButton.title = 'Search an address';
 
-  // Function to handle the selected address
-  function onSelected(feature) {
-      obj.label = feature;
-      input.value = typeof obj.label.properties.label === "undefined"? obj.label.properties.display_name : obj.label.properties.label;
-      var coordinates = ol.proj.transform(
-      [feature.geometry.coordinates[0], feature.geometry.coordinates[1]],
-      "EPSG:4326",
-      map.getView().getProjection()
-      );
-      vectorSource.clear(true);
-      obj2.gcd = [feature.geometry.coordinates[0], feature.geometry.coordinates[1]];
-      var marker = new ol.Feature(new ol.geom.Point(coordinates));
-      var zIndex = 1;
-      marker.setStyle(new ol.style.Style({
-      image: new ol.style.Icon(({
-          anchor: [0.5, 1],
-          anchorXUnits: 'fraction',
-          anchorYUnits: 'fraction',
-          scale: 0.7,
-          opacity: 1,
-          src: "./resources/marker.png",
-          zIndex: zIndex
-      })),
-      zIndex: zIndex
-      }));
-      vectorSource.addFeature(marker);
-      map.getView().setCenter(coordinates);
-      map.getView().setZoom(18);
-  }
+// Search input
+var searchInput = document.createElement('input');
+searchInput.type = 'text';
+searchInput.placeholder = 'Search an address';
+searchInput.className = 'list-address-input';
+searchInput.setAttribute('autocomplete', 'off');
 
-  // Format the result in the autocomplete search bar
-  var formatResult = function (feature, el) {
-      var title = document.createElement("strong");
-      el.appendChild(title);
-      var detailsContainer = document.createElement("small");
-      el.appendChild(detailsContainer);
-      var details = [];
-      title.innerHTML = feature.properties.label || feature.properties.display_name;
-      var types = {
-      housenumber: "numéro",
-      street: "rue",
-      locality: "lieu-dit",
-      municipality: "commune",
-      };
-      if (
-      feature.properties.city &&
-      feature.properties.city !== feature.properties.name
-      ) {
-      details.push(feature.properties.city);
-      }
-      if (feature.properties.context) {
-      details.push(feature.properties.context);
-      }
-      detailsContainer.innerHTML = details.join(", ");
-  };
+// Results container
+var resultsContainer = document.createElement('div');
+resultsContainer.className = 'list-address-results';
+resultsContainer.style.display = 'none';
 
-  // Define a class to create the control button for the search bar in a div tag
-  class AddDomControl extends ol.control.Control {
-      constructor(elementToAdd, opt_options) {
-      const options = opt_options || {};
+// Add elements
+searchContainer.appendChild(searchButton);
+searchContainer.appendChild(searchInput);
+searchContainer.appendChild(resultsContainer);
 
-      const element = document.createElement("div");
-      if (options.className) {
-          element.className = options.className;
-      }
-      element.appendChild(elementToAdd);
+// Add the search control to the map
+var listSearchControl = new AddDomControl(searchContainer, {
+    className: 'list-address-search ol-unselectable ol-control'
+});
+map.addControl(listSearchControl);
 
-      super({
-          element: element,
-          target: options.target,
-      });
-      }
-  }
 
-  // Function to show you can do something with the returned elements
-  function myHandler(featureCollection) {
-      //console.log(featureCollection);
-  }
+// Escape special characters for an ArcGIS SQL query
+function escapeSql(value) {
+    return value.replace(/'/g, "''");
+}
 
-  // URL for API
-  const url = {"Nominatim OSM": "https://nominatim.openstreetmap.org/search?format=geojson&addressdetails=1&",
-  "France BAN": "https://api-adresse.data.gouv.fr/search/?"}
-  var API_URL = "//api-adresse.data.gouv.fr";
 
-  // Create search by adresses component
-  var containers = new Photon.Search({
-    resultsHandler: myHandler,
-    onSelected: onSelected,
-    placeholder: "Search an address",
-    formatResult: formatResult,
-    //url: API_URL + "/search/?",
-    url: url["Nominatim OSM"],
-    position: "topright",
-    // ,includePosition: function() {
-    //   return ol.proj.transform(
-    //     map.getView().getCenter(),
-    //     map.getView().getProjection(), //'EPSG:3857',
-    //     'EPSG:4326'
-    //   );
-    // }
-  });
+// Search the LIST Address Geocodes service
+function searchLISTAddresses() {
 
-  // Add the created DOM element within the map
-  //var left = document.getElementById("top-left-container");
-  var controlGeocoder = new AddDomControl(containers, {
-    className: "photon-geocoder-autocomplete ol-unselectable ol-control",
-  });
-  map.addControl(controlGeocoder);
-  var search = document.getElementsByClassName("photon-geocoder-autocomplete ol-unselectable ol-control")[0];
-  search.style.display = "flex";
+    var queryText = searchInput.value.trim();
 
-  // Create the new button element
-  var button = document.createElement("button");
-  button.type = "button";
-  button.id = "gcd-button-control";
-  button.className = "gcd-gl-btn fa fa-search leaflet-control";
+    if (!queryText) {
+        resultsContainer.style.display = 'none';
+        resultsContainer.innerHTML = '';
+        return;
+    }
 
-  // Ajouter le bouton à l'élément parent
-  search.insertBefore(button, search.firstChild);
-  last = search.lastChild;
-  last.style.display = "none";
-  button.addEventListener("click", function (e) {
-      if (last.style.display === "none") {
-          last.style.display = "block";
-      } else {
-          last.style.display = "none";
-      }
-  });
-  input = document.getElementsByClassName("photon-input")[0];
+    resultsContainer.innerHTML = '<div class="list-search-loading">Searching…</div>';
+    resultsContainer.style.display = 'block';
+
+    // Split the search into individual words.
+    // This makes the search tolerant of different address formatting.
+    var searchTerms = queryText
+        .split(/\s+/)
+        .filter(function(term) {
+            return term.length > 0;
+        });
+
+    // Require every search term to occur in the ADDRESS field
+    var whereParts = searchTerms.map(function(term) {
+        return "ADDRESS LIKE '%" + escapeSql(term) + "%'";
+    });
+
+    var whereClause = whereParts.join(' AND ');
+
+    var listUrl =
+        'https://services.thelist.tas.gov.au/arcgis/rest/services/Public/SearchService/MapServer/7/query?' +
+        'where=' + encodeURIComponent(whereClause) +
+        '&outFields=' + encodeURIComponent('ADDRESS,PID,STREET_NUMBER_FROM,STREET_NUMBER_TO,STREET,LOCALITY,STATE,POSTCODE') +
+        '&returnGeometry=true' +
+        '&outSR=3857' +
+        '&f=geojson' +
+        '&resultRecordCount=10';
+
+    fetch(listUrl)
+        .then(function(response) {
+            if (!response.ok) {
+                throw new Error('LIST address search failed');
+            }
+            return response.json();
+        })
+        .then(function(data) {
+
+            resultsContainer.innerHTML = '';
+
+            if (!data.features || data.features.length === 0) {
+                resultsContainer.innerHTML =
+                    '<div class="list-search-no-results">No addresses found</div>';
+                return;
+            }
+
+            data.features.forEach(function(feature) {
+
+                var result = document.createElement('div');
+                result.className = 'list-address-result';
+
+                var address = feature.properties.ADDRESS || '';
+
+                result.innerHTML = '<strong>' + address + '</strong>';
+
+                result.addEventListener('click', function() {
+
+                    var coordinates = feature.geometry.coordinates;
+
+                    // LIST returns the address geometry in EPSG:3857
+                    var point = new ol.geom.Point(coordinates);
+
+                    // Clear any previous address marker
+                    vectorSource.clear(true);
+
+                    // Create marker
+                    var marker = new ol.Feature(point);
+
+                    marker.setStyle(new ol.style.Style({
+                        image: new ol.style.Icon({
+                            anchor: [0.5, 1],
+                            anchorXUnits: 'fraction',
+                            anchorYUnits: 'fraction',
+                            scale: 0.7,
+                            opacity: 1,
+                            src: './resources/marker.png'
+                        })
+                    }));
+
+                    vectorSource.addFeature(marker);
+
+                    // Zoom to selected address
+                    map.getView().setCenter(coordinates);
+                    map.getView().setZoom(18);
+
+                    // Put the selected address into the search box
+                    searchInput.value = address;
+
+                    // Hide results
+                    resultsContainer.style.display = 'none';
+                });
+
+                resultsContainer.appendChild(result);
+            });
+
+            resultsContainer.style.display = 'block';
+        })
+        .catch(function(error) {
+
+            console.error(error);
+
+            resultsContainer.innerHTML =
+                '<div class="list-search-no-results">Unable to search addresses</div>';
+            resultsContainer.style.display = 'block';
+        });
+}
+
+
+// Search when the search button is clicked
+searchButton.addEventListener('click', function() {
+    searchLISTAddresses();
+});
+
+
+// Search when Enter is pressed
+searchInput.addEventListener('keydown', function(event) {
+    if (event.key === 'Enter') {
+        event.preventDefault();
+        searchLISTAddresses();
+    }
+});
+
+
+// Hide results when clicking elsewhere on the map
+map.getViewport().addEventListener('click', function(event) {
+
+    if (!searchContainer.contains(event.target)) {
+        resultsContainer.style.display = 'none';
+    }
+});
   //var searchbar = document.getElementsByClassName("photon-geocoder-autocomplete ol-unselectable ol-control")[0]
   //left.appendChild(searchbar);
         
