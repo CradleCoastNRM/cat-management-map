@@ -1112,13 +1112,14 @@ function searchLISTAddresses() {
 
     var query = input.value.trim();
 
-    if (query.length < 3) {
+    if (query.length < 2) {
 
         resultsContainer.innerHTML = "";
         resultsContainer.style.display = "none";
 
         return;
     }
+
 
     resultsContainer.innerHTML =
         '<div style="padding:10px;">Searching...</div>';
@@ -1127,157 +1128,25 @@ function searchLISTAddresses() {
 
 
     // -----------------------------------------------------
-    // Clean and split the user's search
-    // -----------------------------------------------------
-
-    var searchTerms = query
-        .replace(/,/g, " ")
-        .split(/\s+/)
-        .filter(function(term) {
-            return term.length > 0;
-        });
-
-
-    // -----------------------------------------------------
-    // Recognise common street type variations
-    // -----------------------------------------------------
-
-    var streetTypes = {
-
-        "street": ["street", "st"],
-        "st": ["street", "st"],
-
-        "road": ["road", "rd"],
-        "rd": ["road", "rd"],
-
-        "avenue": ["avenue", "ave"],
-        "ave": ["avenue", "ave"],
-
-        "drive": ["drive", "dr"],
-        "dr": ["drive", "dr"],
-
-        "lane": ["lane", "ln"],
-        "ln": ["lane", "ln"],
-
-        "court": ["court", "ct"],
-        "ct": ["court", "ct"],
-
-        "place": ["place", "pl"],
-        "pl": ["place", "pl"],
-
-        "crescent": ["crescent", "cres"],
-        "cres": ["crescent", "cres"],
-
-        "highway": ["highway", "hwy"],
-        "hwy": ["highway", "hwy"],
-
-        "parade": ["parade", "pde"],
-        "pde": ["parade", "pde"],
-
-        "terrace": ["terrace", "tce"],
-        "tce": ["terrace", "tce"],
-
-        "close": ["close", "cl"],
-        "cl": ["close", "cl"]
-
-    };
-
-
-    // -----------------------------------------------------
-    // Build query conditions
-    // -----------------------------------------------------
-
-    var whereParts = [];
-
-    searchTerms.forEach(function(term) {
-
-        var cleanTerm = term
-            .replace(/'/g, "''")
-            .toLowerCase();
-
-
-        // If this is a number, search the street number
-        // fields rather than relying on the ADDRESS text.
-
-        if (/^\d+$/.test(cleanTerm)) {
-
-            whereParts.push(
-                "(STREET_NUMBER_FROM = " + cleanTerm +
-                " OR STREET_NUMBER_TO = " + cleanTerm + ")"
-            );
-
-            return;
-        }
-
-
-        // If this is a street type, allow both the
-        // full word and its abbreviation.
-
-        if (streetTypes[cleanTerm]) {
-
-            var typeOptions = streetTypes[cleanTerm];
-
-            var typeConditions = typeOptions.map(function(type) {
-
-                var escapedType =
-                    type.replace(/'/g, "''");
-
-                return (
-                    "ADDRESS LIKE '%" +
-                    escapedType +
-                    "%'"
-                );
-
-            });
-
-            whereParts.push(
-                "(" + typeConditions.join(" OR ") + ")"
-            );
-
-            return;
-        }
-
-
-        // Normal word — search ADDRESS, STREET and LOCALITY.
-
-        var escapedTerm =
-            cleanTerm.replace(/'/g, "''");
-
-        whereParts.push(
-            "(" +
-            "ADDRESS LIKE '%" + escapedTerm + "%'" +
-            " OR STREET LIKE '%" + escapedTerm + "%'" +
-            " OR LOCALITY LIKE '%" + escapedTerm + "%'" +
-            ")"
-        );
-
-    });
-
-
-    var whereClause =
-        whereParts.join(" AND ");
-
-
-    console.log(
-        "LIST address search:",
-        whereClause
-    );
-
-
-    // -----------------------------------------------------
-    // LIST Address Geocodes service
+    // LIST SearchService
+    //
+    // This uses the LIST "find" operation rather than
+    // constructing a SQL query ourselves.
+    // Layer 7 = Address Geocodes.
     // -----------------------------------------------------
 
     var listUrl =
-        "https://services.thelist.tas.gov.au/arcgis/rest/services/Public/SearchService/MapServer/7/query?" +
-        "where=" + encodeURIComponent(whereClause) +
-        "&outFields=" + encodeURIComponent(
-            "ADDRESS,PID,PROPERTY_NAME,LOCATION,UNIT_TYPE,UNIT_NUMBER,STREET_NUMBER_FROM,STREET_NUMBER_TO,STREET,STREET_TYPE,LOCALITY,STATE,POSTCODE"
-        ) +
+        "https://services.thelist.tas.gov.au/arcgis/rest/services/Public/SearchService/MapServer/find?" +
+        "searchText=" + encodeURIComponent(query) +
+        "&contains=true" +
+        "&searchFields=ADDRESS" +
+        "&layers=7" +
         "&returnGeometry=true" +
-        "&outSR=3857" +
-        "&f=geojson" +
-        "&resultRecordCount=10";
+        "&sr=3857" +
+        "&f=json";
+
+
+    console.log("LIST search URL:", listUrl);
 
 
     fetch(listUrl)
@@ -1287,7 +1156,8 @@ function searchLISTAddresses() {
             if (!response.ok) {
 
                 throw new Error(
-                    "LIST address search failed"
+                    "LIST address search failed: " +
+                    response.status
                 );
 
             }
@@ -1298,11 +1168,17 @@ function searchLISTAddresses() {
 
         .then(function(data) {
 
+            console.log("LIST search response:", data);
+
             resultsContainer.innerHTML = "";
 
 
-            if (!data.features ||
-                data.features.length === 0) {
+            // -------------------------------------------------
+            // No results
+            // -------------------------------------------------
+
+            if (!data.results ||
+                data.results.length === 0) {
 
                 resultsContainer.innerHTML =
                     '<div style="padding:10px;">No addresses found</div>';
@@ -1315,73 +1191,167 @@ function searchLISTAddresses() {
             // Display matching addresses
             // -------------------------------------------------
 
-            data.features.forEach(function(feature) {
+            data.results.forEach(function(result) {
 
-                var result =
+                var resultDiv =
                     document.createElement("div");
 
-                result.className =
+
+                resultDiv.className =
                     "list-address-result";
 
-                result.style.padding =
+
+                resultDiv.style.padding =
                     "9px 10px";
 
-                result.style.cursor =
+                resultDiv.style.cursor =
                     "pointer";
 
-                result.style.borderBottom =
+                resultDiv.style.borderBottom =
                     "1px solid #dddddd";
 
-                result.style.backgroundColor =
+                resultDiv.style.backgroundColor =
                     "#ffffff";
 
-                result.style.fontSize =
+                resultDiv.style.fontSize =
                     "13px";
 
 
+                // The LIST find operation returns the
+                // address in result.value.
+
                 var address =
-                    feature.properties.ADDRESS ||
+                    result.value ||
                     "Address";
 
 
-                result.textContent =
+                resultDiv.textContent =
                     address;
 
 
-                result.addEventListener(
+                // -------------------------------------------------
+                // Highlight result
+                // -------------------------------------------------
+
+                resultDiv.addEventListener(
                     "mouseover",
                     function() {
 
-                        result.style.backgroundColor =
+                        resultDiv.style.backgroundColor =
                             "#eeeeee";
 
                     }
                 );
 
 
-                result.addEventListener(
+                resultDiv.addEventListener(
                     "mouseout",
                     function() {
 
-                        result.style.backgroundColor =
+                        resultDiv.style.backgroundColor =
                             "#ffffff";
 
                     }
                 );
 
 
-                // Select address
+                // -------------------------------------------------
+                // Select result
+                // -------------------------------------------------
 
-                result.addEventListener(
+                resultDiv.addEventListener(
                     "click",
                     function() {
 
                         input.value =
                             address;
 
-                        onLISTAddressSelected(
-                            feature
-                        );
+
+                        // -------------------------------------------------
+                        // LIST returns ArcGIS geometry as:
+                        //
+                        // geometry.x
+                        // geometry.y
+                        //
+                        // rather than GeoJSON coordinates.
+                        // -------------------------------------------------
+
+                        if (result.geometry &&
+                            result.geometry.x !== undefined &&
+                            result.geometry.y !== undefined) {
+
+
+                            var coordinates = [
+                                result.geometry.x,
+                                result.geometry.y
+                            ];
+
+
+                            // Clear previous address marker
+
+                            vectorSource.clear(true);
+
+
+                            // Create new marker
+
+                            var marker =
+                                new ol.Feature(
+                                    new ol.geom.Point(
+                                        coordinates
+                                    )
+                                );
+
+
+                            marker.setStyle(
+                                new ol.style.Style({
+
+                                    image:
+                                        new ol.style.Icon({
+
+                                            anchor:
+                                                [0.5, 1],
+
+                                            anchorXUnits:
+                                                "fraction",
+
+                                            anchorYUnits:
+                                                "fraction",
+
+                                            scale:
+                                                0.7,
+
+                                            opacity:
+                                                1,
+
+                                            src:
+                                                "./resources/marker.png"
+
+                                        })
+
+                                })
+                            );
+
+
+                            vectorSource.addFeature(
+                                marker
+                            );
+
+
+                            // Zoom to the address
+
+                            map.getView().setCenter(
+                                coordinates
+                            );
+
+
+                            map.getView().setZoom(
+                                18
+                            );
+
+                        }
+
+
+                        // Hide results
 
                         resultsContainer.style.display =
                             "none";
@@ -1391,7 +1361,7 @@ function searchLISTAddresses() {
 
 
                 resultsContainer.appendChild(
-                    result
+                    resultDiv
                 );
 
             });
@@ -1404,6 +1374,7 @@ function searchLISTAddresses() {
                 "LIST address search error:",
                 error
             );
+
 
             resultsContainer.innerHTML =
                 '<div style="padding:10px;">Unable to search addresses</div>';
