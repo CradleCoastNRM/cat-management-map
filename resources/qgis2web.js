@@ -929,7 +929,8 @@ let measuring = false;
 
 //geocoder - Tasmania LIST Address Geocodes
 
-// Layer used to display the selected address marker
+
+// Layer to represent the selected address
 var geocoderLayer = new ol.layer.Vector({
     source: new ol.source.Vector()
 });
@@ -939,13 +940,14 @@ map.addLayer(geocoderLayer);
 var vectorSource = geocoderLayer.getSource();
 
 
-// Function to handle a selected LIST address
+// Handle a selected address
 function onLISTAddressSelected(feature) {
 
     var coordinates = feature.geometry.coordinates;
 
-    // LIST Address Geocodes are returned in EPSG:3857,
-    // which is the projection used by this web map.
+    // LIST returns coordinates in EPSG:3857,
+    // which matches the web map projection.
+
     vectorSource.clear(true);
 
     var marker = new ol.Feature(
@@ -954,28 +956,31 @@ function onLISTAddressSelected(feature) {
 
     var zIndex = 1;
 
-    marker.setStyle(new ol.style.Style({
-        image: new ol.style.Icon({
-            anchor: [0.5, 1],
-            anchorXUnits: 'fraction',
-            anchorYUnits: 'fraction',
-            scale: 0.7,
-            opacity: 1,
-            src: "./resources/marker.png",
+    marker.setStyle(
+        new ol.style.Style({
+            image: new ol.style.Icon({
+                anchor: [0.5, 1],
+                anchorXUnits: 'fraction',
+                anchorYUnits: 'fraction',
+                scale: 0.7,
+                opacity: 1,
+                src: "./resources/marker.png"
+            }),
             zIndex: zIndex
-        }),
-        zIndex: zIndex
-    }));
+        })
+    );
 
     vectorSource.addFeature(marker);
 
-    // Centre and zoom the map
     map.getView().setCenter(coordinates);
     map.getView().setZoom(18);
 }
 
 
+// ---------------------------------------------------------
 // Create the search control
+// ---------------------------------------------------------
+
 var searchContainer = document.createElement("div");
 
 searchContainer.className =
@@ -984,7 +989,8 @@ searchContainer.className =
 searchContainer.style.display = "flex";
 
 
-// Create the search button
+// Search button
+
 var button = document.createElement("button");
 
 button.type = "button";
@@ -993,15 +999,16 @@ button.className = "gcd-gl-btn fa fa-search leaflet-control";
 button.title = "Search an address";
 
 
-// Create the search area
+// Search area
+
 var searchArea = document.createElement("div");
 
-searchArea.className = "photon-autocomplete";
 searchArea.style.display = "none";
 searchArea.style.position = "relative";
 
 
-// Create the input
+// Search input
+
 var input = document.createElement("input");
 
 input.type = "text";
@@ -1010,7 +1017,8 @@ input.placeholder = "Search an address";
 input.autocomplete = "off";
 
 
-// Create results container
+// Results list
+
 var resultsContainer = document.createElement("div");
 
 resultsContainer.className = "list-address-results";
@@ -1027,17 +1035,46 @@ resultsContainer.style.zIndex = "9999";
 resultsContainer.style.display = "none";
 
 
-// Assemble search area
+// Put input and results together
+
 searchArea.appendChild(input);
 searchArea.appendChild(resultsContainer);
 
 
-// Assemble search control
+// Put button and search area together
+
 searchContainer.appendChild(button);
 searchContainer.appendChild(searchArea);
 
 
-// Use the existing qgis2web control system
+// ---------------------------------------------------------
+// qgis2web control wrapper
+// ---------------------------------------------------------
+
+class AddDomControl extends ol.control.Control {
+
+    constructor(elementToAdd, opt_options) {
+
+        const options = opt_options || {};
+
+        const element = document.createElement("div");
+
+        if (options.className) {
+            element.className = options.className;
+        }
+
+        element.appendChild(elementToAdd);
+
+        super({
+            element: element,
+            target: options.target
+        });
+    }
+}
+
+
+// Create the OpenLayers control
+
 var controlGeocoder = new AddDomControl(searchContainer, {
     className:
         "photon-geocoder-autocomplete ol-unselectable ol-control"
@@ -1046,7 +1083,10 @@ var controlGeocoder = new AddDomControl(searchContainer, {
 map.addControl(controlGeocoder);
 
 
-// Search button opens/closes the search box
+// ---------------------------------------------------------
+// Open / close search box
+// ---------------------------------------------------------
+
 button.addEventListener("click", function() {
 
     if (searchArea.style.display === "none") {
@@ -1064,37 +1104,46 @@ button.addEventListener("click", function() {
 });
 
 
+// ---------------------------------------------------------
 // Search the LIST Address Geocodes service
+// ---------------------------------------------------------
+
 function searchLISTAddresses() {
 
     var query = input.value.trim();
 
     if (query.length < 3) {
 
-        resultsContainer.style.display = "none";
         resultsContainer.innerHTML = "";
+        resultsContainer.style.display = "none";
 
         return;
     }
 
 
-    resultsContainer.style.display = "block";
-
     resultsContainer.innerHTML =
         '<div style="padding:10px;">Searching...</div>';
 
+    resultsContainer.style.display = "block";
 
-    // Remove commas and split the search into individual words
+
+    // Remove commas and split the search into words
+
     var searchTerms = query
         .replace(/,/g, " ")
         .split(/\s+/)
         .filter(function(term) {
+
             return term.length > 0;
+
         });
 
 
-    // Build the ArcGIS SQL query.
-    // Every search term must occur in the ADDRESS field.
+    // Build an ArcGIS SQL query.
+    //
+    // Every word entered by the user must occur
+    // somewhere in the ADDRESS field.
+
     var whereParts = searchTerms.map(function(term) {
 
         var escapedTerm = term.replace(/'/g, "''");
@@ -1106,6 +1155,8 @@ function searchLISTAddresses() {
 
     var whereClause = whereParts.join(" AND ");
 
+
+    // LIST Address Geocodes service
 
     var listUrl =
         "https://services.thelist.tas.gov.au/arcgis/rest/services/Public/SearchService/MapServer/7/query?" +
@@ -1124,7 +1175,9 @@ function searchLISTAddresses() {
         .then(function(response) {
 
             if (!response.ok) {
-                throw new Error("LIST search failed");
+
+                throw new Error("LIST address search failed");
+
             }
 
             return response.json();
@@ -1136,7 +1189,8 @@ function searchLISTAddresses() {
             resultsContainer.innerHTML = "";
 
 
-            if (!data.features || data.features.length === 0) {
+            if (!data.features ||
+                data.features.length === 0) {
 
                 resultsContainer.innerHTML =
                     '<div style="padding:10px;">No addresses found</div>';
@@ -1145,55 +1199,90 @@ function searchLISTAddresses() {
             }
 
 
-            // Create a result for each matching address
+            // Add each matching address to the results list
+
             data.features.forEach(function(feature) {
 
-                var result = document.createElement("div");
+                var result =
+                    document.createElement("div");
 
-                result.className = "list-address-result";
 
-                result.style.padding = "9px 10px";
-                result.style.cursor = "pointer";
-                result.style.borderBottom = "1px solid #dddddd";
-                result.style.backgroundColor = "#ffffff";
-                result.style.fontSize = "13px";
+                result.className =
+                    "list-address-result";
+
+
+                result.style.padding =
+                    "9px 10px";
+
+                result.style.cursor =
+                    "pointer";
+
+                result.style.borderBottom =
+                    "1px solid #dddddd";
+
+                result.style.backgroundColor =
+                    "#ffffff";
+
+                result.style.fontSize =
+                    "13px";
 
 
                 var address =
-                    feature.properties.ADDRESS || "Address";
+                    feature.properties.ADDRESS ||
+                    "Address";
 
 
-                result.textContent = address;
+                result.textContent =
+                    address;
 
 
-                // Highlight result when mouse is over it
-                result.addEventListener("mouseover", function() {
+                // Highlight result on mouseover
 
-                    result.style.backgroundColor = "#eeeeee";
+                result.addEventListener(
+                    "mouseover",
+                    function() {
 
-                });
+                        result.style.backgroundColor =
+                            "#eeeeee";
 
-
-                result.addEventListener("mouseout", function() {
-
-                    result.style.backgroundColor = "#ffffff";
-
-                });
+                    }
+                );
 
 
-                // Select address
-                result.addEventListener("click", function() {
+                result.addEventListener(
+                    "mouseout",
+                    function() {
 
-                    input.value = address;
+                        result.style.backgroundColor =
+                            "#ffffff";
 
-                    onLISTAddressSelected(feature);
-
-                    resultsContainer.style.display = "none";
-
-                });
+                    }
+                );
 
 
-                resultsContainer.appendChild(result);
+                // Select the address
+
+                result.addEventListener(
+                    "click",
+                    function() {
+
+                        input.value =
+                            address;
+
+                        onLISTAddressSelected(
+                            feature
+                        );
+
+                        resultsContainer.style.display =
+                            "none";
+
+                    }
+                );
+
+
+                resultsContainer.appendChild(
+                    result
+                );
 
             });
 
@@ -1211,52 +1300,72 @@ function searchLISTAddresses() {
 }
 
 
-// Search after the user pauses typing
+// ---------------------------------------------------------
+// Search while typing
+// ---------------------------------------------------------
+
 var searchTimer = null;
 
 input.addEventListener("input", function() {
 
     clearTimeout(searchTimer);
 
-    searchTimer = setTimeout(function() {
+    searchTimer = setTimeout(
+        function() {
 
-        searchLISTAddresses();
+            searchLISTAddresses();
 
-    }, 350);
+        },
+        400
+    );
 
 });
 
 
-// Also search when Enter is pressed
-input.addEventListener("keydown", function(event) {
+// ---------------------------------------------------------
+// Search when Enter is pressed
+// ---------------------------------------------------------
 
-    if (event.key === "Enter") {
+input.addEventListener(
+    "keydown",
+    function(event) {
 
-        event.preventDefault();
+        if (event.key === "Enter") {
 
-        clearTimeout(searchTimer);
+            event.preventDefault();
 
-        searchLISTAddresses();
+            clearTimeout(searchTimer);
+
+            searchLISTAddresses();
+
+        }
 
     }
+);
 
-});
 
+// ---------------------------------------------------------
+// Hide results when clicking elsewhere
+// ---------------------------------------------------------
 
-// Hide results if the user clicks somewhere else
-map.getViewport().addEventListener("click", function(event) {
+map.getViewport().addEventListener(
+    "click",
+    function(event) {
 
-    if (!searchContainer.contains(event.target)) {
+        if (!searchContainer.contains(event.target)) {
 
-        resultsContainer.style.display = "none";
+            resultsContainer.style.display =
+                "none";
+
+        }
 
     }
+);
 
-});
 
-
-// Keep the search bar available to the existing qgis2web
+// This is used later by the qgis2web
 // control-positioning code.
+
 var searchbar =
     document.getElementsByClassName(
         "photon-geocoder-autocomplete ol-unselectable ol-control"
