@@ -1120,49 +1120,159 @@ function searchLISTAddresses() {
         return;
     }
 
-
     resultsContainer.innerHTML =
         '<div style="padding:10px;">Searching...</div>';
 
     resultsContainer.style.display = "block";
 
 
-    // Remove commas and split the search into words
+    // -----------------------------------------------------
+    // Clean and split the user's search
+    // -----------------------------------------------------
 
     var searchTerms = query
         .replace(/,/g, " ")
         .split(/\s+/)
         .filter(function(term) {
-
             return term.length > 0;
-
         });
 
 
-    // Build an ArcGIS SQL query.
-    //
-    // Every word entered by the user must occur
-    // somewhere in the ADDRESS field.
+    // -----------------------------------------------------
+    // Recognise common street type variations
+    // -----------------------------------------------------
 
-    var whereParts = searchTerms.map(function(term) {
+    var streetTypes = {
 
-        var escapedTerm = term.replace(/'/g, "''");
+        "street": ["street", "st"],
+        "st": ["street", "st"],
 
-        return "ADDRESS LIKE '%" + escapedTerm + "%'";
+        "road": ["road", "rd"],
+        "rd": ["road", "rd"],
+
+        "avenue": ["avenue", "ave"],
+        "ave": ["avenue", "ave"],
+
+        "drive": ["drive", "dr"],
+        "dr": ["drive", "dr"],
+
+        "lane": ["lane", "ln"],
+        "ln": ["lane", "ln"],
+
+        "court": ["court", "ct"],
+        "ct": ["court", "ct"],
+
+        "place": ["place", "pl"],
+        "pl": ["place", "pl"],
+
+        "crescent": ["crescent", "cres"],
+        "cres": ["crescent", "cres"],
+
+        "highway": ["highway", "hwy"],
+        "hwy": ["highway", "hwy"],
+
+        "parade": ["parade", "pde"],
+        "pde": ["parade", "pde"],
+
+        "terrace": ["terrace", "tce"],
+        "tce": ["terrace", "tce"],
+
+        "close": ["close", "cl"],
+        "cl": ["close", "cl"]
+
+    };
+
+
+    // -----------------------------------------------------
+    // Build query conditions
+    // -----------------------------------------------------
+
+    var whereParts = [];
+
+    searchTerms.forEach(function(term) {
+
+        var cleanTerm = term
+            .replace(/'/g, "''")
+            .toLowerCase();
+
+
+        // If this is a number, search the street number
+        // fields rather than relying on the ADDRESS text.
+
+        if (/^\d+$/.test(cleanTerm)) {
+
+            whereParts.push(
+                "(STREET_NUMBER_FROM = " + cleanTerm +
+                " OR STREET_NUMBER_TO = " + cleanTerm + ")"
+            );
+
+            return;
+        }
+
+
+        // If this is a street type, allow both the
+        // full word and its abbreviation.
+
+        if (streetTypes[cleanTerm]) {
+
+            var typeOptions = streetTypes[cleanTerm];
+
+            var typeConditions = typeOptions.map(function(type) {
+
+                var escapedType =
+                    type.replace(/'/g, "''");
+
+                return (
+                    "ADDRESS LIKE '%" +
+                    escapedType +
+                    "%'"
+                );
+
+            });
+
+            whereParts.push(
+                "(" + typeConditions.join(" OR ") + ")"
+            );
+
+            return;
+        }
+
+
+        // Normal word — search ADDRESS, STREET and LOCALITY.
+
+        var escapedTerm =
+            cleanTerm.replace(/'/g, "''");
+
+        whereParts.push(
+            "(" +
+            "ADDRESS LIKE '%" + escapedTerm + "%'" +
+            " OR STREET LIKE '%" + escapedTerm + "%'" +
+            " OR LOCALITY LIKE '%" + escapedTerm + "%'" +
+            ")"
+        );
 
     });
 
 
-    var whereClause = whereParts.join(" AND ");
+    var whereClause =
+        whereParts.join(" AND ");
 
 
+    console.log(
+        "LIST address search:",
+        whereClause
+    );
+
+
+    // -----------------------------------------------------
     // LIST Address Geocodes service
+    // -----------------------------------------------------
 
     var listUrl =
         "https://services.thelist.tas.gov.au/arcgis/rest/services/Public/SearchService/MapServer/7/query?" +
         "where=" + encodeURIComponent(whereClause) +
         "&outFields=" + encodeURIComponent(
-            "ADDRESS,PID,PROPERTY_NAME,LOCATION,UNIT_TYPE,UNIT_NUMBER,STREET_NUMBER_FROM,STREET_NUMBER_TO,STREET,LOCALITY,STATE,POSTCODE"
+            "ADDRESS,PID,PROPERTY_NAME,LOCATION,UNIT_TYPE,UNIT_NUMBER,STREET_NUMBER_FROM,STREET_NUMBER_TO,STREET,STREET_TYPE,LOCALITY,STATE,POSTCODE"
         ) +
         "&returnGeometry=true" +
         "&outSR=3857" +
@@ -1176,7 +1286,9 @@ function searchLISTAddresses() {
 
             if (!response.ok) {
 
-                throw new Error("LIST address search failed");
+                throw new Error(
+                    "LIST address search failed"
+                );
 
             }
 
@@ -1199,17 +1311,17 @@ function searchLISTAddresses() {
             }
 
 
-            // Add each matching address to the results list
+            // -------------------------------------------------
+            // Display matching addresses
+            // -------------------------------------------------
 
             data.features.forEach(function(feature) {
 
                 var result =
                     document.createElement("div");
 
-
                 result.className =
                     "list-address-result";
-
 
                 result.style.padding =
                     "9px 10px";
@@ -1236,8 +1348,6 @@ function searchLISTAddresses() {
                     address;
 
 
-                // Highlight result on mouseover
-
                 result.addEventListener(
                     "mouseover",
                     function() {
@@ -1260,7 +1370,7 @@ function searchLISTAddresses() {
                 );
 
 
-                // Select the address
+                // Select address
 
                 result.addEventListener(
                     "click",
@@ -1290,7 +1400,10 @@ function searchLISTAddresses() {
 
         .catch(function(error) {
 
-            console.error(error);
+            console.error(
+                "LIST address search error:",
+                error
+            );
 
             resultsContainer.innerHTML =
                 '<div style="padding:10px;">Unable to search addresses</div>';
@@ -1298,7 +1411,6 @@ function searchLISTAddresses() {
         });
 
 }
-
 
 // ---------------------------------------------------------
 // Search while typing
